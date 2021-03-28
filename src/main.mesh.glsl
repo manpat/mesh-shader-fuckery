@@ -97,29 +97,39 @@ const vec3 colors[] = {
 };
 
 layout(triangles) out;
-layout(local_size_x=1) in;
+layout(local_size_x=32) in;
 layout(max_vertices=64, max_primitives=126) out;
 
 void main() {
-	uint meshlet_id = gl_WorkGroupID.x;
-	uint local_id = gl_LocalInvocationID.x;
+	const uint num_threads = gl_WorkGroupSize.x;
+	const uint max_vertices = gl_MeshVerticesNV.length();
+	const uint max_primitives = gl_PrimitiveIndicesNV.length() / 3;
+
+	const uint meshlet_id = gl_WorkGroupID.x;
+	const uint local_id = gl_LocalInvocationID.x;
 
 	Meshlet meshlet = fetch_meshlet(meshlet_id);
 
-	for (int v = 0; v < meshlet.vertex_count; v++){
-		uint vertex_index = fetch_vertex_index(meshlet.vertex_begin + v).x;
+	const uint vertex_iterations = (max_vertices + num_threads - 1) / num_threads;
+
+	for (int v = 0; v < vertex_iterations; v++){
+		uint vertex_index_index = min(v * num_threads + local_id, meshlet.vertex_count-1);
+		uint vertex_index = fetch_vertex_index(meshlet.vertex_begin + vertex_index_index);
 		Vertex vertex = vertices[vertex_index];
 
-		gl_MeshVerticesNV[v].gl_Position = u_projection_view * vec4(vertex.position, 1.0);
-		vert_out[v].color = vertex.color;
+		gl_MeshVerticesNV[vertex_index_index].gl_Position = u_projection_view * vec4(vertex.position, 1.0);
+		vert_out[vertex_index_index].color = vertex.color;
 	}
 
-	for (int p = 0; p < meshlet.primitive_count; p++){
-		uvec3 triangle = fetch_triangle_indices(meshlet.primitive_begin + p);
-		gl_PrimitiveIndicesNV[p * 3 + 0] = triangle.x;
-		gl_PrimitiveIndicesNV[p * 3 + 1] = triangle.y;
-		gl_PrimitiveIndicesNV[p * 3 + 2] = triangle.z;
-		prim_out[p].color = colors[meshlet_id % colors.length()];
+	const uint primitive_iterations = (max_primitives + num_threads - 1) / num_threads;
+
+	for (int p = 0; p < primitive_iterations; p++){
+		uint primitive_index = min(p * num_threads + local_id, meshlet.primitive_count-1);
+		uvec3 triangle = fetch_triangle_indices(meshlet.primitive_begin + primitive_index);
+		gl_PrimitiveIndicesNV[primitive_index * 3 + 0] = triangle.x;
+		gl_PrimitiveIndicesNV[primitive_index * 3 + 1] = triangle.y;
+		gl_PrimitiveIndicesNV[primitive_index * 3 + 2] = triangle.z;
+		prim_out[primitive_index].color = colors[meshlet_id % colors.length()];
 	}
 
 	if (local_id == 0) {
