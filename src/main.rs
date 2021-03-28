@@ -1,3 +1,5 @@
+#![feature(type_ascription)]
+
 pub mod gl {
 	include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
@@ -39,6 +41,8 @@ impl Vertex {
 
 
 fn main() -> Result<(), Box<dyn Error>> {
+	std::env::set_var("RUST_BACKTRACE", "1");
+
 	let sdl = sdl2::init()?;
 	let sdl_video = sdl.video()?;
 
@@ -91,38 +95,65 @@ fn main() -> Result<(), Box<dyn Error>> {
 	}
 
 
-	// let toy_scene = toy::load(include_bytes!("fish.toy"))?;
-	// println!("{:?}", toy_scene);
+	let toy_project = toy::load(include_bytes!("fish.toy"))?;
+	let toy_scene = toy_project.find_scene("main").expect("Missing main scene");
 
-	// let ground_ent = toy_scene.find_entity("Ground").expect("Missing Ground Entity");
+	let mut mb = MeshletBuilder::new();
+
+	for entity in toy_scene.entities() {
+		if entity.name.contains('_') { continue }
+
+		let mesh_data = match entity.mesh_data() {
+			Some(md) => md,
+			None => continue,
+		};
+
+		let color_data = mesh_data.color_data(None).unwrap();
+
+		let transform = entity.transform();
+		let vertices = mesh_data.positions.iter()
+			.zip(&color_data.data)
+			.map(|(&pos, &col)| {
+				Vertex::new(transform * pos, col.to_vec3())
+			})
+			.collect(): Vec<_>;
+
+		mb.append(&vertices, &mesh_data.indices);
+	}
+
+	let mesh = mb.build();
+
+	println!("verts: {}", mesh.vertex_data.len());
+	println!("meshlets: {}", mesh.num_meshlets);
 
 
-	let vertices = [
-		Vertex::new(Vec3::new(-1.0,-1.0,-1.0), Vec3::splat(1.0)),
-		Vertex::new(Vec3::new(-1.0,-1.0, 1.0), Vec3::splat(1.0)),
-		Vertex::new(Vec3::new( 1.0,-1.0, 1.0), Vec3::splat(1.0)),
-		Vertex::new(Vec3::new( 1.0,-1.0,-1.0), Vec3::splat(1.0)),
 
-		Vertex::new(Vec3::new(-1.0, 1.0,-1.0), Vec3::splat(0.5)),
-		Vertex::new(Vec3::new( 1.0, 1.0,-1.0), Vec3::splat(0.5)),
-		Vertex::new(Vec3::new( 1.0, 1.0, 1.0), Vec3::splat(0.5)),
-		Vertex::new(Vec3::new(-1.0, 1.0, 1.0), Vec3::splat(0.5)),
-	];
+	// let vertices = [
+	// 	Vertex::new(Vec3::new(-1.0,-1.0,-1.0), Vec3::splat(1.0)),
+	// 	Vertex::new(Vec3::new(-1.0,-1.0, 1.0), Vec3::splat(1.0)),
+	// 	Vertex::new(Vec3::new( 1.0,-1.0, 1.0), Vec3::splat(1.0)),
+	// 	Vertex::new(Vec3::new( 1.0,-1.0,-1.0), Vec3::splat(1.0)),
 
-	let indices = [
-		0, 1, 2,  0, 2, 3, // bottom
-		4, 5, 6,  4, 7, 6, // top
+	// 	Vertex::new(Vec3::new(-1.0, 1.0,-1.0), Vec3::splat(0.5)),
+	// 	Vertex::new(Vec3::new( 1.0, 1.0,-1.0), Vec3::splat(0.5)),
+	// 	Vertex::new(Vec3::new( 1.0, 1.0, 1.0), Vec3::splat(0.5)),
+	// 	Vertex::new(Vec3::new(-1.0, 1.0, 1.0), Vec3::splat(0.5)),
+	// ];
 
-		0, 1, 7,  0, 7, 4, // left
-		3, 6, 2,  3, 5, 6, // right
+	// let indices = [
+	// 	0, 1, 2,  0, 2, 3, // bottom
+	// 	4, 5, 6,  4, 7, 6, // top
 
-		0, 3, 5,  0, 5, 4, // back
-		1, 6, 7,  1, 2, 6, // front
-	];
+	// 	0, 1, 7,  0, 7, 4, // left
+	// 	3, 6, 2,  3, 5, 6, // right
+
+	// 	0, 3, 5,  0, 5, 4, // back
+	// 	1, 6, 7,  1, 2, 6, // front
+	// ];
 
 
-	let meshlet_data = generate_meshlet_data(&indices);
-	dbg!(&meshlet_data);
+	// let meshlet_data = generate_meshlet_data(&indices);
+	// dbg!(&mesh);
 
 
 	// let particle_program = {
@@ -210,8 +241,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 		gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, buf);
 		gl::BufferData(
 			gl::SHADER_STORAGE_BUFFER,
-			(vertices.len() * std::mem::size_of::<Vertex>()) as _,
-			vertices.as_ptr() as *const _,
+			(mesh.vertex_data.len() * std::mem::size_of::<Vertex>()) as _,
+			mesh.vertex_data.as_ptr() as *const _,
 			gl::STATIC_DRAW
 		);
 
@@ -226,8 +257,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 		gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, buf);
 		gl::BufferData(
 			gl::SHADER_STORAGE_BUFFER,
-			meshlet_data.data.len() as _,
-			meshlet_data.data.as_ptr() as *const _,
+			mesh.meshlet_data.len() as _,
+			mesh.meshlet_data.as_ptr() as *const _,
 			gl::STATIC_DRAW
 		);
 
@@ -235,6 +266,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 		gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0);
 		buf
 	};
+
+
+	let timer_object = unsafe {
+		let mut id = 0;
+		gl::GenQueries(1, &mut id);
+		id
+	};
+
+	let mut timer_waiting = false;
+	let mut timer_avg = 0.0f64;
 
 
 	let main_program = {
@@ -261,9 +302,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 		time += 1.0 / 60.0;
 
 		uniforms.projection_view = Mat4::perspective(PI/3.0, 1.0, 0.01, 100.0)
-			* Mat4::translate(Vec3::from_z(-3.0))
-			* Mat4::xrot(time * PI / 7.0)
-			* Mat4::yrot(-time * PI / 4.0);
+			* Mat4::translate(Vec3::from_z(-10.0))
+			* Mat4::xrot(PI / 7.0)
+			* Mat4::yrot(-time * PI / 8.0)
+			;
 
 		unsafe {
 			gl::BindBuffer(gl::UNIFORM_BUFFER, uniform_buffer);
@@ -280,10 +322,33 @@ fn main() -> Result<(), Box<dyn Error>> {
 			gl::ClearColor(0.2, 0.2, 0.2, 1.0);
 			gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
-			// gl::UseProgram(particle_program);
-			// gl::DrawMeshTasksNV(0, ((data.len() + 7) / 8) as _);
 			gl::UseProgram(main_program);
-			gl::DrawMeshTasksNV(0, meshlet_data.num_meshlets as _);
+
+			if !timer_waiting {
+				gl::BeginQuery(gl::TIME_ELAPSED, timer_object);
+			}
+
+			gl::DrawMeshTasksNV(0, mesh.num_meshlets as _);
+
+			if !timer_waiting {
+				gl::EndQuery(gl::TIME_ELAPSED);
+				timer_waiting = true;
+			}
+
+
+			if timer_waiting {
+				let mut ready = 0;
+				gl::GetQueryObjectiv(timer_object, gl::QUERY_RESULT_AVAILABLE, &mut ready);
+				if ready != 0 {
+					let mut time_elapsed = 0;
+					gl::GetQueryObjectiv(timer_object, gl::QUERY_RESULT, &mut time_elapsed);
+
+					timer_avg += (time_elapsed as f64 - timer_avg) * 0.1;
+					println!("timer_avg {:.2}us", timer_avg / 1000.0);
+
+					timer_waiting = false;
+				}
+			};
 		}
 
 		window.gl_swap_window();
@@ -307,9 +372,10 @@ struct MeshletDescriptor {
 }
 
 #[derive(Debug)]
-struct MeshletData {
+struct MeshData {
+	vertex_data: Vec<Vertex>,
+	meshlet_data: Vec<u8>,
 	num_meshlets: usize,
-	data: Vec<u8>,
 }
 
 #[repr(C)]
@@ -326,133 +392,161 @@ const MAX_MESHLET_VERTICES: usize = 64;
 // const MAX_MESHLET_VERTICES: usize = 5;
 
 
-fn generate_meshlet_data(triangle_indices: &[u16]) -> MeshletData {
-	let mut meshlet_descriptors: Vec<MeshletDescriptor> = Vec::new();
-	let mut vertex_indices: Vec<u16> = Vec::new();
-	let mut primitive_indices: Vec<u8> = Vec::new();
+struct MeshletBuilder {
+	vertices: Vec<Vertex>,
 
-	let mut vertex_begin = 0usize;
-	let mut primitive_begin = 0usize;
+	meshlet_descriptors: Vec<MeshletDescriptor>,
+	vertex_indices: Vec<u32>,
+	primitive_indices: Vec<u8>,
 
-	for triangle in triangle_indices.chunks(3) {
-		let mut vertex_unique = [false; 3];
-		for (unique, vertex) in vertex_unique.iter_mut().zip(triangle) {
-			*unique = !vertex_indices[vertex_begin..].contains(&vertex);
-		}
-
-		let new_vertices = vertex_unique.iter().filter(|v| **v).count();
-		let vertex_count = vertex_indices.len() - vertex_begin;
-		let primitive_count = (primitive_indices.len() - primitive_begin) / 3;
-
-		if vertex_count + new_vertices > MAX_MESHLET_VERTICES {
-			meshlet_descriptors.push(MeshletDescriptor {
-				vertex_count: vertex_count as u32,
-				primitive_count: primitive_count as u32,
-				vertex_begin: vertex_begin as u32,
-				primitive_begin: (primitive_begin / 3) as u32,
-			});
-
-			primitive_begin = primitive_indices.len();
-			vertex_begin = vertex_indices.len();
-
-			vertex_unique = [true; 3];
-		}
-
-		for (&vertex, &unique) in triangle.iter().zip(&vertex_unique) {
-			if unique {
-				vertex_indices.push(vertex);
-			}
-		}
-
-		let vertices = &vertex_indices[vertex_begin..];
-		for &vertex in triangle {
-			let prim_index = vertices.iter().position(|&v| v == vertex).unwrap() as u8;
-			primitive_indices.push(prim_index);
-
-		}
-
-		let primitive_count = (primitive_indices.len() - primitive_begin) / 3;
-		let vertex_count = vertex_indices.len() - vertex_begin;
-
-		if primitive_count >= MAX_MESHLET_TRIANGLES {
-			meshlet_descriptors.push(MeshletDescriptor {
-				vertex_count: vertex_count as u32,
-				primitive_count: primitive_count as u32,
-				vertex_begin: vertex_begin as u32,
-				primitive_begin: (primitive_begin / 3) as u32,
-			});
-
-			primitive_begin = primitive_indices.len();
-			vertex_begin = vertex_indices.len();
-		}
-	}
-
-	let primitive_count = (primitive_indices.len() - primitive_begin) / 3;
-	let vertex_count = vertex_indices.len() - vertex_begin;
-
-	if primitive_count > 0 {
-		meshlet_descriptors.push(MeshletDescriptor {
-			vertex_count: vertex_count as u32,
-			primitive_count: primitive_count as u32,
-			vertex_begin: vertex_begin as u32,
-			primitive_begin: (primitive_begin / 3) as u32,
-		});
-	}
-
-
-	// pad to 32b
-	if vertex_indices.len() % 2 == 1 {
-		vertex_indices.push(0);
-	}
-
-	// pad to 32b
-	for _ in primitive_indices.len() .. (primitive_indices.len() + 3) / 4*4 {
-		primitive_indices.push(0);
-	}
-
-
-	use std::mem::size_of;
-
-	let header_size = size_of::<MeshletDataHeader>();
-	let meshlet_descriptor_size = size_of::<MeshletDescriptor>() * meshlet_descriptors.len();
-	let vertex_indices_size = size_of::<u16>() * vertex_indices.len();
-	let primitive_indices_size = size_of::<u8>() * primitive_indices.len();
-
-	assert!(header_size % 4 == 0);
-	assert!(meshlet_descriptor_size % 4 == 0);
-	assert!(vertex_indices_size % 4 == 0);
-	assert!(primitive_indices_size % 4 == 0);
-
-	let header = MeshletDataHeader {
-		vertex_indices_offset: ((header_size + meshlet_descriptor_size) / 4) as _,
-		primitive_indices_offset: ((header_size + meshlet_descriptor_size + vertex_indices_size) / 4) as _,
-	};
-
-	let buffer_size = header_size
-		+ meshlet_descriptor_size
-		+ vertex_indices_size
-		+ primitive_indices_size;
-
-	let mut buffer = vec![0u8; buffer_size];
-
-	{
-		let (header_bytes, rest) = buffer.split_at_mut(header_size);
-		let (meshlet_desc_bytes, rest) = rest.split_at_mut(meshlet_descriptor_size);
-		let (vertex_indices_bytes, rest) = rest.split_at_mut(vertex_indices_size);
-		let (primitve_indices_bytes, _) = rest.split_at_mut(primitive_indices_size);
-
-		header_bytes.copy_from_slice(as_bytes(&[header]));
-		meshlet_desc_bytes.copy_from_slice(as_bytes(&meshlet_descriptors));
-		vertex_indices_bytes.copy_from_slice(as_bytes(&vertex_indices));
-		primitve_indices_bytes.copy_from_slice(as_bytes(&primitive_indices));
-	}
-
-	MeshletData {
-		num_meshlets: meshlet_descriptors.len(),
-		data: buffer,
-	}
+	vertex_begin: usize,
+	primitive_begin: usize,
 }
 
+impl MeshletBuilder {
+	fn new() -> MeshletBuilder {
+		MeshletBuilder {
+			vertices: Vec::new(),
+
+			meshlet_descriptors: Vec::new(),
+			vertex_indices: Vec::new(),
+			primitive_indices: Vec::new(),
+
+			vertex_begin: 0,
+			primitive_begin: 0,
+		}
+	}
+
+	fn append(&mut self, vertices: &[Vertex], triangle_indices: &[u16]) {
+		let vertex_start = self.vertices.len() as u32;
+
+		self.vertices.extend_from_slice(vertices);
+
+		for triangle in triangle_indices.chunks(3) {
+			let mut vertex_unique = [false; 3];
+			for (unique, &vertex) in vertex_unique.iter_mut().zip(triangle) {
+				let vertex = vertex_start + vertex as u32;
+				*unique = !self.vertex_indices[self.vertex_begin..].contains(&vertex);
+			}
+
+			let new_vertices = vertex_unique.iter().filter(|v| **v).count();
+			let vertex_count = self.vertex_indices.len() - self.vertex_begin;
+			let primitive_count = (self.primitive_indices.len() - self.primitive_begin) / 3;
+
+			if vertex_count + new_vertices > MAX_MESHLET_VERTICES {
+				self.meshlet_descriptors.push(MeshletDescriptor {
+					vertex_count: vertex_count as u32,
+					primitive_count: primitive_count as u32,
+					vertex_begin: self.vertex_begin as u32,
+					primitive_begin: (self.primitive_begin / 3) as u32,
+				});
+
+				self.primitive_begin = self.primitive_indices.len();
+				self.vertex_begin = self.vertex_indices.len();
+
+				vertex_unique = [true; 3];
+			}
+
+			for (&vertex, &unique) in triangle.iter().zip(&vertex_unique) {
+				if unique {
+					self.vertex_indices.push(vertex_start + vertex as u32);
+				}
+			}
+
+			let vertices = &self.vertex_indices[self.vertex_begin..];
+			for &vertex in triangle {
+				let vertex = vertex_start + vertex as u32;
+				let prim_index = vertices.iter().position(|&v| v == vertex).unwrap() as u8;
+				self.primitive_indices.push(prim_index);
+
+			}
+
+			let primitive_count = (self.primitive_indices.len() - self.primitive_begin) / 3;
+			let vertex_count = self.vertex_indices.len() - self.vertex_begin;
+
+			if primitive_count >= MAX_MESHLET_TRIANGLES {
+				self.meshlet_descriptors.push(MeshletDescriptor {
+					vertex_count: vertex_count as u32,
+					primitive_count: primitive_count as u32,
+					vertex_begin: self.vertex_begin as u32,
+					primitive_begin: (self.primitive_begin / 3) as u32,
+				});
+
+				self.primitive_begin = self.primitive_indices.len();
+				self.vertex_begin = self.vertex_indices.len();
+			}
+		}
+	}
+
+
+	fn build(mut self) -> MeshData {
+		let primitive_count = (self.primitive_indices.len() - self.primitive_begin) / 3;
+		let vertex_count = self.vertex_indices.len() - self.vertex_begin;
+
+		if primitive_count > 0 {
+			self.meshlet_descriptors.push(MeshletDescriptor {
+				vertex_count: vertex_count as u32,
+				primitive_count: primitive_count as u32,
+				vertex_begin: self.vertex_begin as u32,
+				primitive_begin: (self.primitive_begin / 3) as u32,
+			});
+		}
+
+		// pad to 32b
+		// if self.vertex_indices.len() % 2 == 1 {
+		// 	self.vertex_indices.push(0);
+		// }
+
+		// pad to 32b
+		for _ in self.primitive_indices.len() .. (self.primitive_indices.len() + 3) / 4*4 {
+			self.primitive_indices.push(0);
+		}
+
+
+		use std::mem::size_of;
+
+		let header_size = size_of::<MeshletDataHeader>();
+		let meshlet_descriptor_size = size_of::<MeshletDescriptor>() * self.meshlet_descriptors.len();
+		let vertex_indices_size = size_of::<u32>() * self.vertex_indices.len();
+		let primitive_indices_size = size_of::<u8>() * self.primitive_indices.len();
+
+		assert!(header_size % 4 == 0);
+		assert!(meshlet_descriptor_size % 4 == 0);
+		assert!(vertex_indices_size % 4 == 0);
+		assert!(primitive_indices_size % 4 == 0);
+
+		let header = MeshletDataHeader {
+			vertex_indices_offset: ((header_size + meshlet_descriptor_size) / 4) as _,
+			primitive_indices_offset: ((header_size + meshlet_descriptor_size + vertex_indices_size) / 4) as _,
+		};
+
+		let buffer_size = header_size
+			+ meshlet_descriptor_size
+			+ vertex_indices_size
+			+ primitive_indices_size;
+
+		let mut buffer = vec![0u8; buffer_size];
+
+		{
+			let (header_bytes, rest) = buffer.split_at_mut(header_size);
+			let (meshlet_desc_bytes, rest) = rest.split_at_mut(meshlet_descriptor_size);
+			let (vertex_indices_bytes, rest) = rest.split_at_mut(vertex_indices_size);
+			let (primitve_indices_bytes, _) = rest.split_at_mut(primitive_indices_size);
+
+			header_bytes.copy_from_slice(as_bytes(&[header]));
+			meshlet_desc_bytes.copy_from_slice(as_bytes(&self.meshlet_descriptors));
+			vertex_indices_bytes.copy_from_slice(as_bytes(&self.vertex_indices));
+			primitve_indices_bytes.copy_from_slice(as_bytes(&self.primitive_indices));
+		}
+
+		MeshData {
+			vertex_data: self.vertices,
+			meshlet_data: buffer,
+			num_meshlets: self.meshlet_descriptors.len(),
+		}
+	}
+
+}
 
 fn as_bytes<T>(buf: &[T]) -> &[u8] {
 	use std::mem::size_of;

@@ -384,7 +384,7 @@ dependencies = [
 [[package]]
 name = "toy"
 version = "0.1.0"
-source = "git+https://github.com/manpat/toy-rs.git#034cc63f0f1a7aa27b5bf9a926c1ae3dc7891e0a"
+source = "git+https://github.com/manpat/toy-rs.git#942d1e675a59398c7bff387f08c229b181012e84"
 dependencies = [
  "common",
  "failure",

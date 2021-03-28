@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 sdl2 = { version = ">=0.33", features = ["bundled", "static-link"] }
+# toy = { path = "../toy-rs" }
 toy = { git = "https://github.com/manpat/toy-rs.git" }
 common = { git = "https://github.com/manpat/common-rs.git" }
 

@@ -51,9 +51,10 @@ Meshlet fetch_meshlet(uint index) {
 
 uint fetch_vertex_index(uint index) {
 	uint vertex_indices_offset = meshlet_data[0];
-	uint packed_value = meshlet_data[vertex_indices_offset + index / 2];
-	int which = int(index) % 2;
-	return bitfieldExtract(packed_value, which * 16, 16);
+	return meshlet_data[vertex_indices_offset + index];
+	// uint packed_value = meshlet_data[vertex_indices_offset + index / 2];
+	// int which = int(index) % 2;
+	// return bitfieldExtract(packed_value, which * 16, 16);
 }
 
 uvec3 fetch_triangle_indices(uint index) {
@@ -129,7 +130,7 @@ void main() {
 		gl_PrimitiveIndicesNV[primitive_index * 3 + 0] = triangle.x;
 		gl_PrimitiveIndicesNV[primitive_index * 3 + 1] = triangle.y;
 		gl_PrimitiveIndicesNV[primitive_index * 3 + 2] = triangle.z;
-		prim_out[primitive_index].color = colors[meshlet_id % colors.length()];
+		prim_out[primitive_index].color = vec3(1.0); // colors[meshlet_id % colors.length()];
 	}
 
 	if (local_id == 0) {
