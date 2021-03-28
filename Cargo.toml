@@ -1,0 +1,13 @@
+[package]
+name = "mesh-shaders"
+version = "0.1.0"
+authors = ["Patrick Monaghan <0x5f.manpat@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sdl2 = { version = ">=0.33", features = ["bundled", "static-link"] }
+toy = { git = "https://github.com/manpat/toy-rs.git" }
+common = { git = "https://github.com/manpat/common-rs.git" }
+
+[build-dependencies]
+gl_generator = "0.14.0"
