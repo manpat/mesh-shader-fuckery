@@ -14,15 +14,15 @@ struct Meshlet {
 	uint primitive_begin;
 };
 
-layout(std140, binding = 2) uniform UniformData {
+layout(std140, binding = 0) uniform UniformData {
 	layout(row_major) mat4 u_projection_view;
 };
 
-layout(std430, binding = 3) buffer VertexData {
+layout(std430, binding = 0) buffer VertexData {
 	Vertex vertices[];
 };
 
-layout(std430, binding = 4) buffer MeshletData {
+layout(std430, binding = 1) buffer MeshletData {
 	uint meshlet_data[];
 };
 

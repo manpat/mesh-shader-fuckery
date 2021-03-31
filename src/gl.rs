@@ -4,7 +4,7 @@ pub mod raw {
 }
 
 
-pub struct GlContext {
+pub struct Context {
 	_sdl_ctx: sdl2::video::GLContext,
 }
 
@@ -24,7 +24,7 @@ pub struct Buffer (u32);
 
 
 
-impl GlContext {
+impl Context {
 	pub fn new(sdl_ctx: sdl2::video::GLContext) -> Self {
 		unsafe {
 			raw::DebugMessageCallback(Some(gl_message_callback), std::ptr::null());
@@ -50,7 +50,7 @@ impl GlContext {
 			);
 		}
 
-		GlContext {
+		Context {
 			_sdl_ctx: sdl_ctx
 		}
 	}
@@ -133,6 +133,12 @@ impl GlContext {
 	pub fn use_program(&self, program: Program) {
 		unsafe {
 			raw::UseProgram(program.0);
+		}
+	}
+
+	pub fn draw_mesh_tasks(&self, offset: u32, count: u32) {
+		unsafe {
+			raw::DrawMeshTasksNV(offset, count);
 		}
 	}
 }
