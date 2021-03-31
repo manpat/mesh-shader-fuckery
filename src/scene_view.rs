@@ -1,7 +1,7 @@
 
 use std::error::Error;
 use common::math::*;
-use crate::{gl, mesh};
+use crate::{gl, mesh, perf};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -75,12 +75,14 @@ impl SceneView {
 		})
 	}
 
-	pub fn draw(&self, gl_ctx: &gl::Context) {
+	pub fn draw(&self, gl_ctx: &gl::Context, inst: &mut perf::Instrumenter) {
 		gl_ctx.bind_shader_storage_buffer(0, self.vertex_ssbo);
 		gl_ctx.bind_shader_storage_buffer(1, self.meshlet_data_ssbo);
 
 		gl_ctx.use_program(self.program);
 
+		inst.start_section("scene");
 		gl_ctx.draw_mesh_tasks(0, self.num_meshlets);
+		inst.end_section();
 	}
 }

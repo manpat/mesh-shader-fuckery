@@ -1,6 +1,10 @@
 #version 450
 #extension GL_NV_mesh_shader : require
 
+layout(triangles) out;
+layout(local_size_x=32) in;
+layout(max_vertices=64, max_primitives=126) out;
+
 
 struct Vertex {
 	vec3 position;
@@ -16,6 +20,8 @@ struct Meshlet {
 
 layout(std140, binding = 0) uniform UniformData {
 	layout(row_major) mat4 u_projection_view;
+	vec4 up;
+	vec4 right;
 };
 
 layout(std430, binding = 0) buffer VertexData {
@@ -96,10 +102,6 @@ const vec3 colors[] = {
 	vec3(0.5, 1.0, 0.5),
 	vec3(1.0, 1.0, 1.0),
 };
-
-layout(triangles) out;
-layout(local_size_x=32) in;
-layout(max_vertices=64, max_primitives=126) out;
 
 void main() {
 	const uint num_threads = gl_WorkGroupSize.x;

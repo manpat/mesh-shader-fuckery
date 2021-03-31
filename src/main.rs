@@ -2,26 +2,21 @@
 
 pub mod gl;
 pub mod mesh;
+pub mod perf;
 
 pub mod scene_view;
+pub mod particles;
 
 use std::error::Error;
 use common::math::*;
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct Particle {
-	pos: Vec2,
-	size: Vec2,
-	color: Vec3,
-	_pad: f32,
-}
 
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct Uniforms {
 	projection_view: Mat4,
+	up: Vec4,
+	right: Vec4,
 	// NOTE: align to Vec4s
 }
 
@@ -61,9 +56,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let (window, gl_ctx) = init_window(&sdl_video)?;
 
+	let mut instrumenter = perf::Instrumenter::new(&gl_ctx);
 
 	let mut uniforms = Uniforms {
 		projection_view: Mat4::ident(),
+		up: Vec4::from_y(1.0),
+		right: Vec4::from_x(1.0),
 	};
 
 	let uniform_buffer = gl_ctx.new_buffer();
@@ -71,37 +69,51 @@ fn main() -> Result<(), Box<dyn Error>> {
 	gl_ctx.bind_uniform_buffer(0, uniform_buffer);
 
 	let scene_view = scene_view::SceneView::new(&gl_ctx)?;
+	let particles = particles::ParticleSystem::new(&gl_ctx);
 
 	let mut event_pump = sdl.event_pump()?;
 	let mut time = 0.0f32;
+	let mut aspect = 1.0f32;
 
 	'main: loop {
 		for event in event_pump.poll_iter() {
-			use sdl2::event::Event;
+			use sdl2::event::{Event, WindowEvent};
 			use sdl2::keyboard::Keycode;
 
 			match event {
 				Event::Quit {..} | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'main,
+				Event::Window{ win_event: WindowEvent::Resized(w, h), .. } => unsafe {
+					gl::raw::Viewport(0, 0, w as _, h as _);
+					aspect = w as f32 / h as f32;
+				}
 				_ => {}
 			}
 		}
 
 		time += 1.0 / 60.0;
 
-		uniforms.projection_view = Mat4::perspective(PI/3.0, 1.0, 0.01, 100.0)
-			* Mat4::translate(Vec3::from_z(-10.0))
-			* Mat4::xrot(PI / 7.0)
-			* Mat4::yrot(-time * PI / 8.0)
-			;
+		let camera_orientation = Mat4::yrot(time * PI / 8.0) * Mat4::xrot(-PI / 7.0);
+
+		uniforms.up = camera_orientation * Vec4::from_y(1.0);
+		uniforms.right = camera_orientation * Vec4::from_x(1.0);
+
+		uniforms.projection_view = Mat4::perspective(PI/3.0, aspect, 0.01, 100.0)
+			* Mat4::translate(Vec3::from_z(-50.0))
+			* camera_orientation.inverse();
 
 		uniform_buffer.upload(&[uniforms], gl::BufferUsage::Stream);
+
+		particles.update(&gl_ctx, &mut instrumenter);
 
 		unsafe {
 			gl::raw::ClearColor(0.2, 0.2, 0.2, 1.0);
 			gl::raw::Clear(gl::raw::COLOR_BUFFER_BIT | gl::raw::DEPTH_BUFFER_BIT);
 		}
 
-		scene_view.draw(&gl_ctx);
+		scene_view.draw(&gl_ctx, &mut instrumenter);
+		particles.draw(&gl_ctx, &mut instrumenter);
+
+		instrumenter.end_frame();
 
 		window.gl_swap_window();
 	}

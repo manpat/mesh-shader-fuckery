@@ -30,6 +30,7 @@ impl Context {
 			raw::DebugMessageCallback(Some(gl_message_callback), std::ptr::null());
 			raw::Enable(raw::DEBUG_OUTPUT_SYNCHRONOUS);
 			raw::Enable(raw::DEPTH_TEST);
+			raw::Enable(raw::PROGRAM_POINT_SIZE);
 
 			// Disable performance messages
 			raw::DebugMessageControl(
