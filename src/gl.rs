@@ -22,6 +22,9 @@ pub enum BufferUsage {
 #[derive(Copy, Clone, Debug)]
 pub struct Buffer (u32);
 
+#[derive(Copy, Clone, Debug)]
+pub struct Texture (u32);
+
 
 
 impl Context {
@@ -29,8 +32,12 @@ impl Context {
 		unsafe {
 			raw::DebugMessageCallback(Some(gl_message_callback), std::ptr::null());
 			raw::Enable(raw::DEBUG_OUTPUT_SYNCHRONOUS);
-			raw::Enable(raw::DEPTH_TEST);
 			raw::Enable(raw::PROGRAM_POINT_SIZE);
+
+			raw::Enable(raw::DEPTH_TEST);
+			raw::Enable(raw::BLEND);
+			raw::BlendFunc(raw::DST_COLOR, raw::ZERO);
+			raw::BlendEquation(raw::FUNC_ADD);
 
 			// Disable performance messages
 			raw::DebugMessageControl(
@@ -64,6 +71,16 @@ impl Context {
 		}
 	}
 
+	pub fn new_texture(&self, width: u32, height: u32, format: u32) -> Texture {
+		unsafe {
+			let mut tex = 0;
+			raw::CreateTextures(raw::TEXTURE_2D, 1, &mut tex);
+			raw::TextureStorage2D(tex, 1, format, 4096, 4096);
+			raw::TextureParameteri(tex, raw::TEXTURE_MIN_FILTER, raw::LINEAR as _);
+			Texture(tex)
+		}
+	}
+
 	pub fn bind_uniform_buffer(&self, binding: u32, buffer: Buffer) {
 		unsafe {
 			raw::BindBufferBase(raw::UNIFORM_BUFFER, binding, buffer.0);
@@ -73,6 +90,19 @@ impl Context {
 	pub fn bind_shader_storage_buffer(&self, binding: u32, buffer: Buffer) {
 		unsafe {
 			raw::BindBufferBase(raw::SHADER_STORAGE_BUFFER, binding, buffer.0);
+		}
+	}
+
+	pub fn bind_image_rw(&self, binding: u32, texture: Texture, format: u32) {
+		unsafe {
+			let (level, layered, layer) = (0, 0, 0);
+			raw::BindImageTexture(binding, texture.0, level, layered, layer, raw::READ_WRITE, format);
+		}
+	}
+
+	pub fn bind_texture(&self, binding: u32, texture: Texture) {
+		unsafe {
+			raw::BindTextureUnit(binding, texture.0);
 		}
 	}
 
@@ -142,6 +172,12 @@ impl Context {
 			raw::DrawMeshTasksNV(offset, count);
 		}
 	}
+
+	pub fn dispatch_compute(&self, x: u32, y: u32, z: u32) {
+		unsafe {
+			raw::DispatchCompute(x, y, z);
+		}
+	}
 }
 
 
@@ -162,6 +198,15 @@ impl Buffer {
 				data.as_ptr() as *const _,
 				usage
 			);
+		}
+	}
+}
+
+
+impl Texture {
+	pub fn clear(&self) {
+		unsafe {
+			raw::ClearTexImage(self.0, 0, raw::RED, raw::FLOAT, &0.0f32 as *const f32 as _);
 		}
 	}
 }

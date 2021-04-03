@@ -6,6 +6,7 @@ pub mod perf;
 
 pub mod scene_view;
 pub mod particles;
+pub mod paint;
 
 use std::error::Error;
 use common::math::*;
@@ -70,15 +71,30 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let scene_view = scene_view::SceneView::new(&gl_ctx)?;
 	let particles = particles::ParticleSystem::new(&gl_ctx);
+	let mut paint_system = paint::PaintSystem::new(&gl_ctx);
 
 	let mut event_pump = sdl.event_pump()?;
-	let mut time = 0.0f32;
 	let mut aspect = 1.0f32;
+	let mut zoom = 12.0f32;
+
+	let mut yaw = 0.0f32;
+	let mut pitch = -PI / 5.0;
+
+	let mut left_down = false;
+	let mut right_down = false;
+	let mut update_enabled = true;
+
+	let mut scene_view_enabled = true;
+	let mut particles_enabled = true;
+	let mut paint_enabled = true;
+
+	let mut mouse_world_pos = Vec2::zero();
 
 	'main: loop {
 		for event in event_pump.poll_iter() {
 			use sdl2::event::{Event, WindowEvent};
 			use sdl2::keyboard::Keycode;
+			use sdl2::mouse::{MouseButton, MouseWheelDirection};
 
 			match event {
 				Event::Quit {..} | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'main,
@@ -86,32 +102,106 @@ fn main() -> Result<(), Box<dyn Error>> {
 					gl::raw::Viewport(0, 0, w as _, h as _);
 					aspect = w as f32 / h as f32;
 				}
+
+				Event::MouseWheel { y, .. } => {
+					zoom = (zoom.log2() - y as f32 / 5.0).exp2();
+				}
+
+				Event::MouseMotion { xrel, yrel, x, y, .. } => {
+					if left_down {
+						yaw += xrel as f32 * 0.005;
+						pitch = (pitch - yrel as f32 * 0.005).clamp(-PI, PI);
+					}
+
+					let (w, h) = window.drawable_size();
+					let mouse_x =  x as f32 / w as f32 * 2.0 - 1.0;
+					let mouse_y = -(y as f32 / h as f32 * 2.0 - 1.0);
+
+					let proj_view_inv = uniforms.projection_view.inverse();
+
+					let near_point = proj_view_inv * Vec4::new(mouse_x, mouse_y, -1.0, 1.0);
+					let near_point = near_point.to_vec3() / near_point.w;
+
+					let far_point = proj_view_inv * Vec4::new(mouse_x, mouse_y, 1.0, 1.0);
+					let far_point = far_point.to_vec3() / far_point.w;
+
+					let ray_dir = (far_point - near_point).normalize();
+
+					let plane = Plane::new(Vec3::from_y(1.0), 0.0);
+
+					if plane.normal.dot(ray_dir).abs() > 0.01 {
+						let t = (plane.length - plane.normal.dot(near_point)) / plane.normal.dot(ray_dir);
+						let world_pos = near_point + ray_dir * t;
+
+						mouse_world_pos = world_pos.to_xz();
+					}
+				}
+
+				Event::MouseButtonDown { mouse_btn, x, y, .. } => match mouse_btn {
+					MouseButton::Left => { left_down = true }
+					MouseButton::Right => { right_down = true }
+					_ => {}
+				}
+
+				Event::MouseButtonUp { mouse_btn, .. } => match mouse_btn {
+					MouseButton::Left => { left_down = false }
+					MouseButton::Right => { right_down = false }
+					_ => {}
+				}
+
+				Event::KeyDown { keycode: Some(Keycode::Space), .. } => { update_enabled = !update_enabled }
+				Event::KeyDown { keycode: Some(keycode), .. } => match keycode {
+					Keycode::Num1 => { scene_view_enabled = !scene_view_enabled }
+					Keycode::Num2 => { particles_enabled = !particles_enabled }
+					Keycode::Num3 => { paint_enabled = !paint_enabled }
+					_ => {}
+				}
 				_ => {}
 			}
 		}
 
-		time += 1.0 / 60.0;
+		if right_down {
+			paint_system.paint(mouse_world_pos);
+		}
 
-		let camera_orientation = Mat4::yrot(time * PI / 8.0) * Mat4::xrot(-PI / 7.0);
+		let camera_orientation = Mat4::yrot(yaw) * Mat4::xrot(pitch);
 
 		uniforms.up = camera_orientation * Vec4::from_y(1.0);
 		uniforms.right = camera_orientation * Vec4::from_x(1.0);
 
-		uniforms.projection_view = Mat4::perspective(PI/3.0, aspect, 0.01, 100.0)
-			* Mat4::translate(Vec3::from_z(-50.0))
-			* camera_orientation.inverse();
+		uniforms.projection_view = Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
+			* Mat4::translate(Vec3::from_z(-zoom))
+			* camera_orientation.inverse()
+			* Mat4::translate(Vec3::from_y(-2.0));
 
 		uniform_buffer.upload(&[uniforms], gl::BufferUsage::Stream);
 
-		particles.update(&gl_ctx, &mut instrumenter);
+		if update_enabled {
+			if particles_enabled {
+				particles.update(&gl_ctx, &mut instrumenter);
+			}
+
+			if paint_enabled {
+				paint_system.update(&gl_ctx, &mut instrumenter);
+			}
+		}
 
 		unsafe {
-			gl::raw::ClearColor(0.2, 0.2, 0.2, 1.0);
+			gl::raw::ClearColor(1.0, 1.0, 1.0, 1.0);
 			gl::raw::Clear(gl::raw::COLOR_BUFFER_BIT | gl::raw::DEPTH_BUFFER_BIT);
 		}
 
-		scene_view.draw(&gl_ctx, &mut instrumenter);
-		particles.draw(&gl_ctx, &mut instrumenter);
+		if scene_view_enabled {
+			scene_view.draw(&gl_ctx, &mut instrumenter);
+		}
+
+		if paint_enabled {
+			paint_system.draw(&gl_ctx, &mut instrumenter);
+		}
+
+		if particles_enabled {
+			particles.draw(&gl_ctx, &mut instrumenter);
+		}
 
 		instrumenter.end_frame();
 

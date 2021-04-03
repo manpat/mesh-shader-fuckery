@@ -7,13 +7,15 @@ use crate::{gl, perf};
 struct Particle {
 	pos: Vec3,
 	_0: f32,
-	color: Vec3,
+	velocity: Vec3,
 	_1: f32,
+	tail: Vec3,
+	_2: f32,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct Stats {
+struct StatsBuffer {
 	particle_buffer_size: u32,
 	max_task_output_count: u32,
 }
@@ -25,6 +27,9 @@ pub struct ParticleSystem {
 
 	particle_ssbo: gl::Buffer,
 	stats_ssbo: gl::Buffer,
+
+	particle_buffer_size: u32,
+	max_task_output_count: u32,
 }
 
 impl ParticleSystem {
@@ -42,20 +47,29 @@ impl ParticleSystem {
 		
 		let mut particles = Vec::new();
 
-		for z in -500..500 {
-			for x in -500..500 {
-				for y in 0..50 {
+		let mut offset = 0.0f32;
+
+		for z in -10..10 {
+			for x in -10..10 {
+				for y in 0..64 {
 					let x = x as f32 * 0.1;
 					let z = z as f32 * 0.1;
 					let y = y as f32 * 0.1;
 
 					let pos = Vec3::new(x, y, z);
-					let color = Vec3::new(1.0, 5.0, 1.0);
+					let velocity = Vec3::from_y_angle(z * y + x * x + offset)
+						+ Vec3::from_x_angle(x * z - y * offset);
+
+					let velocity = velocity * (offset * offset).sin() * 0.1;
+
+					let tail = pos;
 
 					particles.push(Particle {
-						pos, color,
-						_0: 0.0, _1: 0.0,
+						pos, velocity, tail,
+						_0: 0.0, _1: 0.0, _2: 0.0,
 					});
+
+					offset += 0.5;
 				}
 			}
 		}
@@ -68,10 +82,10 @@ impl ParticleSystem {
 		println!("particles: {:?}", particles.len());
 		println!("required tasks: {:?}", particles.len() / max_task_output_count as usize);
 
-		let stats = Stats {
-			particle_buffer_size: particles.len() as u32,
-			max_task_output_count: max_task_output_count as u32,
-		};
+		let particle_buffer_size = particles.len() as u32;
+		let max_task_output_count = max_task_output_count as u32;
+
+		let stats = StatsBuffer {particle_buffer_size, max_task_output_count};
 
 		let particle_ssbo = gl_ctx.new_buffer();
 		let stats_ssbo = gl_ctx.new_buffer();
@@ -84,20 +98,49 @@ impl ParticleSystem {
 			simulation_program,
 			particle_ssbo,
 			stats_ssbo,
+
+			particle_buffer_size,
+			max_task_output_count,
 		}
 	}
 
-	pub fn update(&self, gl_ctx: &gl::Context, _inst: &mut perf::Instrumenter) {
+	pub fn update(&self, gl_ctx: &gl::Context, inst: &mut perf::Instrumenter) {
+		gl_ctx.bind_shader_storage_buffer(0, self.particle_ssbo);
+		gl_ctx.use_program(self.simulation_program);
 
+		let particles_per_invocation = 16;
+
+		inst.start_section("particles sim");
+		gl_ctx.dispatch_compute((self.particle_buffer_size + particles_per_invocation - 1) / particles_per_invocation, 1, 1);
+		inst.end_section();
+
+		unsafe {
+			gl::raw::MemoryBarrier(gl::raw::SHADER_STORAGE_BARRIER_BIT);
+		}
 	}
 
 	pub fn draw(&self, gl_ctx: &gl::Context, inst: &mut perf::Instrumenter) {
+		unsafe {
+			gl::raw::Enable(gl::raw::BLEND);
+			gl::raw::BlendFunc(gl::raw::DST_COLOR, gl::raw::ZERO);
+			gl::raw::BlendEquation(gl::raw::FUNC_ADD);
+
+			gl::raw::DepthMask(0);
+		}
+		
 		gl_ctx.bind_shader_storage_buffer(0, self.particle_ssbo);
 		gl_ctx.bind_shader_storage_buffer(1, self.stats_ssbo);
 		gl_ctx.use_program(self.rendering_program);
 
+		let num_task_invocations = (self.particle_buffer_size + self.max_task_output_count - 1) / self.max_task_output_count;
+
 		inst.start_section("particles");
-		gl_ctx.draw_mesh_tasks(0, 1024);
+		gl_ctx.draw_mesh_tasks(0, num_task_invocations);
 		inst.end_section();
+
+		unsafe {
+			gl::raw::Disable(gl::raw::BLEND);
+			gl::raw::DepthMask(1);
+		}
 	}
 }
