@@ -1,7 +1,7 @@
 #version 450
 
+#import global
 #import particle
-#import paint
 
 layout(local_size_x=16, local_size_y=1, local_size_z=1) in;
 
@@ -18,7 +18,7 @@ vec3 sample_paint(vec2 world_pos) {
 		ivec2( 0, 8),
 	};
 
-	vec2 sample_pos = (world_pos + u_paint.world_size/2.0) / u_paint.world_size;
+	vec2 sample_pos = (world_pos + u_world_size/2.0) / u_world_size;
 	vec4 samples = textureGatherOffsets(u_paint_sampler, sample_pos, offsets, 0);
 	return vec3(
 		samples.y - samples.x,

@@ -19,6 +19,7 @@ struct Uniforms {
 	projection_view: Mat4,
 	camera_up: Vec4,
 	camera_right: Vec4,
+	world_size: Vec2, _0: Vec2,
 	// NOTE: align to Vec4s
 }
 
@@ -62,12 +63,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	gl_ctx.add_shader_import("global", include_str!("shaders/global.common.glsl"));
 	gl_ctx.add_shader_import("particle", include_str!("shaders/particle.common.glsl"));
-	gl_ctx.add_shader_import("paint", include_str!("shaders/paint.common.glsl"));
 
 	let mut uniforms = Uniforms {
 		projection_view: Mat4::ident(),
 		camera_up: Vec4::from_y(1.0),
 		camera_right: Vec4::from_x(1.0),
+		world_size: Vec2::splat(50.0),
+
+		_0: Vec2::zero(),
 	};
 
 	let uniform_buffer = gl_ctx.new_buffer();
@@ -246,16 +249,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 			scene_view.draw(&gl_ctx, &mut instrumenter);
 		}
 
+		if terrain_enabled {
+			terrain.draw(&gl_ctx, &mut instrumenter, paint_system.resources());
+		}
+
 		if paint_enabled {
 			paint_system.draw(&gl_ctx, &mut instrumenter);
 		}
 
 		if particles_enabled {
 			particles.draw(&gl_ctx, &mut instrumenter);
-		}
-
-		if terrain_enabled {
-			terrain.draw(&gl_ctx, &mut instrumenter);
 		}
 
 		instrumenter.end_frame();

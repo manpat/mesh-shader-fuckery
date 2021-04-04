@@ -8,6 +8,8 @@ layout(local_size_x=2) in;
 layout(max_vertices=4, max_primitives=2) out;
 
 
+layout(binding = 0) uniform sampler2D u_heightmap_sampler;
+
 out PerVertexData {
 	vec2 uv;
 } vert_out[];

@@ -22,7 +22,6 @@ struct PaintOperation {
 }
 
 pub struct Resources {
-	paint_uniforms: gl::Buffer,
 	texture: gl::Texture,
 }
 
@@ -30,7 +29,6 @@ pub struct PaintSystem {
 	rendering_program: gl::Program,
 	brush_program: gl::Program,
 
-	paint_uniforms: gl::Buffer,
 	brush_uniforms: gl::Buffer,
 	texture: gl::Texture,
 
@@ -48,22 +46,14 @@ impl PaintSystem {
 			(gl::raw::COMPUTE_SHADER, include_str!("shaders/paint_brush.compute.glsl")),
 		]);
 
-		let paint_uniforms = gl_ctx.new_buffer();
 		let brush_uniforms = gl_ctx.new_buffer();
 		let texture = gl_ctx.new_texture(4096, 4096, gl::raw::R32F);
 		texture.clear();
-
-		let uniforms = PaintUniforms {
-			world_size: Vec2::splat(200.0),
-		};
-
-		paint_uniforms.upload(&[uniforms], gl::BufferUsage::Static);
 
 		PaintSystem {
 			rendering_program,
 			brush_program,
 
-			paint_uniforms,
 			brush_uniforms,
 			texture,
 
@@ -73,7 +63,6 @@ impl PaintSystem {
 
 	pub fn resources(&self) -> Resources {
 		Resources {
-			paint_uniforms: self.paint_uniforms,
 			texture: self.texture,
 		}
 	}
@@ -92,8 +81,7 @@ impl PaintSystem {
 
 		gl_ctx.bind_image_rw(0, self.texture, gl::raw::R32F);
 
-		gl_ctx.bind_uniform_buffer(1, self.paint_uniforms);
-		gl_ctx.bind_uniform_buffer(2, self.brush_uniforms);
+		gl_ctx.bind_uniform_buffer(1, self.brush_uniforms);
 		gl_ctx.use_program(self.brush_program);
 
 		for PaintOperation{pos, size} in self.paint_queue.drain(..) {
@@ -104,6 +92,7 @@ impl PaintSystem {
 
 			self.brush_uniforms.upload(&[brush_uniforms], gl::BufferUsage::Dynamic);
 
+			// TODO: actually figure out numbers
 			gl_ctx.dispatch_compute(256, 256, 1);
 		}
 
@@ -121,10 +110,10 @@ impl PaintSystem {
 			gl::raw::Enable(gl::raw::BLEND);
 			gl::raw::BlendFunc(gl::raw::DST_COLOR, gl::raw::ONE);
 			gl::raw::BlendEquation(gl::raw::FUNC_ADD);
+			gl::raw::DepthMask(0);
 		}
 		
 		gl_ctx.bind_texture(0, self.texture);
-		gl_ctx.bind_uniform_buffer(1, self.paint_uniforms);
 		gl_ctx.use_program(self.rendering_program);
 
 		inst.start_section("paint");
@@ -134,6 +123,7 @@ impl PaintSystem {
 		unsafe {
 			gl::raw::Enable(gl::raw::DEPTH_TEST);
 			gl::raw::Disable(gl::raw::BLEND);
+			gl::raw::DepthMask(1);
 		}
 	}
 }
@@ -142,6 +132,5 @@ impl PaintSystem {
 impl Resources {
 	pub fn bind(&self, gl_ctx: &gl::Context, texture_slot: u32) {
 		gl_ctx.bind_texture(texture_slot, self.texture);
-		gl_ctx.bind_uniform_buffer(1, self.paint_uniforms);
 	}
 }
