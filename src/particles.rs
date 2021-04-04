@@ -1,5 +1,5 @@
 use common::math::*;
-use crate::{gl, perf};
+use crate::{gl, perf, paint};
 
 
 #[repr(C)]
@@ -104,7 +104,9 @@ impl ParticleSystem {
 		}
 	}
 
-	pub fn update(&self, gl_ctx: &gl::Context, inst: &mut perf::Instrumenter) {
+	pub fn update(&self, gl_ctx: &gl::Context, inst: &mut perf::Instrumenter, paint_resources: paint::Resources) {
+		paint_resources.bind(gl_ctx, 0);
+
 		gl_ctx.bind_shader_storage_buffer(0, self.particle_ssbo);
 		gl_ctx.use_program(self.simulation_program);
 

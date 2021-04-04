@@ -107,7 +107,7 @@ struct Section {
 }
 
 impl Section {
-	fn new(gl_ctx: &gl::Context) -> Section {
+	fn new(_gl_ctx: &gl::Context) -> Section {
 		unsafe {
 			let mut handles = [0; 2];
 			gl::raw::GenQueries(2, handles.as_mut_ptr());

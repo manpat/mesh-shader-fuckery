@@ -1,4 +1,4 @@
-#![feature(type_ascription, str_split_once)]
+#![feature(type_ascription)]
 
 pub mod gl;
 pub mod mesh;
@@ -6,6 +6,7 @@ pub mod perf;
 
 pub mod scene_view;
 pub mod particles;
+pub mod terrain;
 pub mod paint;
 
 use std::error::Error;
@@ -76,6 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let scene_view = scene_view::SceneView::new(&gl_ctx)?;
 	let particles = particles::ParticleSystem::new(&gl_ctx);
 	let mut paint_system = paint::PaintSystem::new(&gl_ctx);
+	let terrain = terrain::Terrain::new(&gl_ctx);
 
 	let mut event_pump = sdl.event_pump()?;
 	let mut aspect = 1.0f32;
@@ -100,6 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut scene_view_enabled = true;
 	let mut particles_enabled = true;
 	let mut paint_enabled = true;
+	let mut terrain_enabled = true;
 
 	let mut mouse_world_pos = Vec2::zero();
 
@@ -107,7 +110,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		for event in event_pump.poll_iter() {
 			use sdl2::event::{Event, WindowEvent};
 			use sdl2::keyboard::Keycode;
-			use sdl2::mouse::{MouseButton, MouseWheelDirection};
+			use sdl2::mouse::MouseButton;
 
 			match event {
 				Event::Quit {..} | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'main,
@@ -150,7 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 					}
 				}
 
-				Event::MouseButtonDown { mouse_btn, x, y, .. } => match mouse_btn {
+				Event::MouseButtonDown { mouse_btn, .. } => match mouse_btn {
 					MouseButton::Left => { left_down = true }
 					MouseButton::Right => { right_down = true }
 					_ => {}
@@ -167,6 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 					Keycode::Num1 => { scene_view_enabled = !scene_view_enabled }
 					Keycode::Num2 => { particles_enabled = !particles_enabled }
 					Keycode::Num3 => { paint_enabled = !paint_enabled }
+					Keycode::Num4 => { terrain_enabled = !terrain_enabled }
 
 					Keycode::Z => {
 						wireframe_enabled = !wireframe_enabled;
@@ -184,7 +188,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 					Keycode::W => { forward_pressed = false }
 					Keycode::S => { back_pressed = false }
 					Keycode::A => { left_pressed = false }
-					Keycode::D => { right_pressed = false }
 					Keycode::D => { right_pressed = false }
 					Keycode::LShift => { shift_pressed = false }
 					_ => {}
@@ -212,7 +215,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		if back_pressed { camera_pos -= cam_move_fwd }
 		if left_pressed { camera_pos -= cam_move_right }
 		if right_pressed { camera_pos += cam_move_right }
-		
+
 
 		uniforms.camera_up = camera_orientation * Vec4::from_y(1.0);
 		uniforms.camera_right = camera_orientation * Vec4::from_x(1.0);
@@ -226,7 +229,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		if update_enabled {
 			if particles_enabled {
-				particles.update(&gl_ctx, &mut instrumenter);
+				particles.update(&gl_ctx, &mut instrumenter, paint_system.resources());
 			}
 
 			if paint_enabled {
@@ -249,6 +252,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		if particles_enabled {
 			particles.draw(&gl_ctx, &mut instrumenter);
+		}
+
+		if terrain_enabled {
+			terrain.draw(&gl_ctx, &mut instrumenter);
 		}
 
 		instrumenter.end_frame();

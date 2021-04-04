@@ -21,6 +21,11 @@ struct PaintOperation {
 	size: Vec2,
 }
 
+pub struct Resources {
+	paint_uniforms: gl::Buffer,
+	texture: gl::Texture,
+}
+
 pub struct PaintSystem {
 	rendering_program: gl::Program,
 	brush_program: gl::Program,
@@ -31,7 +36,6 @@ pub struct PaintSystem {
 
 	paint_queue: Vec<PaintOperation>,
 }
-
 
 impl PaintSystem {
 	pub fn new(gl_ctx: &gl::Context) -> PaintSystem {
@@ -64,6 +68,13 @@ impl PaintSystem {
 			texture,
 
 			paint_queue: Vec::new(),
+		}
+	}
+
+	pub fn resources(&self) -> Resources {
+		Resources {
+			paint_uniforms: self.paint_uniforms,
+			texture: self.texture,
 		}
 	}
 
@@ -124,5 +135,13 @@ impl PaintSystem {
 			gl::raw::Enable(gl::raw::DEPTH_TEST);
 			gl::raw::Disable(gl::raw::BLEND);
 		}
+	}
+}
+
+
+impl Resources {
+	pub fn bind(&self, gl_ctx: &gl::Context, texture_slot: u32) {
+		gl_ctx.bind_texture(texture_slot, self.texture);
+		gl_ctx.bind_uniform_buffer(1, self.paint_uniforms);
 	}
 }

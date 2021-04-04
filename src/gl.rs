@@ -91,7 +91,7 @@ impl Context {
 		unsafe {
 			let mut tex = 0;
 			raw::CreateTextures(raw::TEXTURE_2D, 1, &mut tex);
-			raw::TextureStorage2D(tex, 1, format, 4096, 4096);
+			raw::TextureStorage2D(tex, 1, format, width as i32, height as i32);
 			raw::TextureParameteri(tex, raw::TEXTURE_MIN_FILTER, raw::LINEAR as _);
 			Texture(tex)
 		}
