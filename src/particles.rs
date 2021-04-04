@@ -35,13 +35,13 @@ pub struct ParticleSystem {
 impl ParticleSystem {
 	pub fn new(gl_ctx: &gl::Context) -> ParticleSystem {
 		let rendering_program = gl_ctx.new_shader(&[
-			(gl::raw::TASK_SHADER_NV, include_str!("particle.task.glsl")),
-			(gl::raw::MESH_SHADER_NV, include_str!("particle.mesh.glsl")),
-			(gl::raw::FRAGMENT_SHADER, include_str!("particle.frag.glsl")),
+			(gl::raw::TASK_SHADER_NV, include_str!("shaders/particle.task.glsl")),
+			(gl::raw::MESH_SHADER_NV, include_str!("shaders/particle.mesh.glsl")),
+			(gl::raw::FRAGMENT_SHADER, include_str!("shaders/particle.frag.glsl")),
 		]);
 
 		let simulation_program = gl_ctx.new_shader(&[
-			(gl::raw::COMPUTE_SHADER, include_str!("particle_simulation.compute.glsl")),
+			(gl::raw::COMPUTE_SHADER, include_str!("shaders/particle_simulation.compute.glsl")),
 		]);
 
 		

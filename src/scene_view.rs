@@ -28,8 +28,8 @@ pub struct SceneView {
 impl SceneView {
 	pub fn new(gl_ctx: &gl::Context) -> Result<SceneView, Box<dyn Error>> {
 		let program = gl_ctx.new_shader(&[
-			(gl::raw::MESH_SHADER_NV, include_str!("scene.mesh.glsl")),
-			(gl::raw::FRAGMENT_SHADER, include_str!("scene.frag.glsl")),
+			(gl::raw::MESH_SHADER_NV, include_str!("shaders/scene.mesh.glsl")),
+			(gl::raw::FRAGMENT_SHADER, include_str!("shaders/scene.frag.glsl")),
 		]);
 
 

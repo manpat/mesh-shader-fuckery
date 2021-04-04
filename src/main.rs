@@ -59,9 +59,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut instrumenter = perf::Instrumenter::new(&gl_ctx);
 
-	gl_ctx.add_shader_import("global", include_str!("global.common.glsl"));
-	gl_ctx.add_shader_import("particle", include_str!("particle.common.glsl"));
-	gl_ctx.add_shader_import("paint", include_str!("paint.common.glsl"));
+	gl_ctx.add_shader_import("global", include_str!("shaders/global.common.glsl"));
+	gl_ctx.add_shader_import("particle", include_str!("shaders/particle.common.glsl"));
+	gl_ctx.add_shader_import("paint", include_str!("shaders/paint.common.glsl"));
 
 	let mut uniforms = Uniforms {
 		projection_view: Mat4::ident(),

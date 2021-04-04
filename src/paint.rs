@@ -36,12 +36,12 @@ pub struct PaintSystem {
 impl PaintSystem {
 	pub fn new(gl_ctx: &gl::Context) -> PaintSystem {
 		let rendering_program = gl_ctx.new_shader(&[
-			(gl::raw::MESH_SHADER_NV, include_str!("paint.mesh.glsl")),
-			(gl::raw::FRAGMENT_SHADER, include_str!("paint.frag.glsl")),
+			(gl::raw::MESH_SHADER_NV, include_str!("shaders/paint.mesh.glsl")),
+			(gl::raw::FRAGMENT_SHADER, include_str!("shaders/paint.frag.glsl")),
 		]);
 
 		let brush_program = gl_ctx.new_shader(&[
-			(gl::raw::COMPUTE_SHADER, include_str!("paint_brush.compute.glsl")),
+			(gl::raw::COMPUTE_SHADER, include_str!("shaders/paint_brush.compute.glsl")),
 		]);
 
 		let paint_uniforms = gl_ctx.new_buffer();
