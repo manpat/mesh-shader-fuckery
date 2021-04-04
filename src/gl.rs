@@ -67,6 +67,18 @@ impl Context {
 		}
 	}
 
+
+	pub fn set_wireframe(&self, wireframe_enabled: bool) {
+		let mode = match wireframe_enabled {
+			false => raw::FILL,
+			true => raw::LINE,
+		};
+
+		unsafe {
+			raw::PolygonMode(raw::FRONT_AND_BACK, mode);
+		}
+	}
+
 	pub fn new_buffer(&self) -> Buffer {
 		unsafe {
 			let mut buf = 0;

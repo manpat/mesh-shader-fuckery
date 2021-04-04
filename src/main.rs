@@ -84,9 +84,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut yaw = 0.0f32;
 	let mut pitch = -PI / 5.0;
 
+	let mut camera_pos = Vec3::from_y(2.0);
+	let mut forward_pressed = false;
+	let mut back_pressed = false;
+	let mut left_pressed = false;
+	let mut right_pressed = false;
+	let mut shift_pressed = false;
+
 	let mut left_down = false;
 	let mut right_down = false;
 	let mut update_enabled = true;
+
+	let mut wireframe_enabled = false;
 
 	let mut scene_view_enabled = true;
 	let mut particles_enabled = true;
@@ -158,6 +167,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 					Keycode::Num1 => { scene_view_enabled = !scene_view_enabled }
 					Keycode::Num2 => { particles_enabled = !particles_enabled }
 					Keycode::Num3 => { paint_enabled = !paint_enabled }
+
+					Keycode::Z => {
+						wireframe_enabled = !wireframe_enabled;
+						gl_ctx.set_wireframe(wireframe_enabled);
+					}
+
+					Keycode::W => { forward_pressed = true }
+					Keycode::S => { back_pressed = true }
+					Keycode::A => { left_pressed = true }
+					Keycode::D => { right_pressed = true }
+					Keycode::LShift => { shift_pressed = true }
+					_ => {}
+				}
+				Event::KeyUp { keycode: Some(keycode), .. } => match keycode {
+					Keycode::W => { forward_pressed = false }
+					Keycode::S => { back_pressed = false }
+					Keycode::A => { left_pressed = false }
+					Keycode::D => { right_pressed = false }
+					Keycode::D => { right_pressed = false }
+					Keycode::LShift => { shift_pressed = false }
 					_ => {}
 				}
 				_ => {}
@@ -168,7 +197,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 			paint_system.paint(mouse_world_pos);
 		}
 
-		let camera_orientation = Mat4::yrot(yaw) * Mat4::xrot(pitch);
+		let camera_yaw_mat = Mat4::yrot(yaw);
+		let camera_orientation = camera_yaw_mat * Mat4::xrot(pitch);
+
+		let move_speed = match shift_pressed {
+			true => 15.0,
+			false => 5.0,
+		};
+
+		let cam_move_fwd = camera_yaw_mat * Vec3::from_z(-move_speed / 60.0);
+		let cam_move_right = camera_yaw_mat * Vec3::from_x(move_speed / 60.0);
+
+		if forward_pressed { camera_pos += cam_move_fwd }
+		if back_pressed { camera_pos -= cam_move_fwd }
+		if left_pressed { camera_pos -= cam_move_right }
+		if right_pressed { camera_pos += cam_move_right }
+		
 
 		uniforms.camera_up = camera_orientation * Vec4::from_y(1.0);
 		uniforms.camera_right = camera_orientation * Vec4::from_x(1.0);
@@ -176,7 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		uniforms.projection_view = Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
 			* Mat4::translate(Vec3::from_z(-zoom))
 			* camera_orientation.inverse()
-			* Mat4::translate(Vec3::from_y(-2.0));
+			* Mat4::translate(-camera_pos);
 
 		uniform_buffer.upload(&[uniforms], gl::BufferUsage::Stream);
 
