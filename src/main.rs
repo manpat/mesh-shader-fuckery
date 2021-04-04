@@ -1,4 +1,4 @@
-#![feature(type_ascription)]
+#![feature(type_ascription, str_split_once)]
 
 pub mod gl;
 pub mod mesh;
@@ -16,8 +16,8 @@ use common::math::*;
 #[derive(Copy, Clone, Debug)]
 struct Uniforms {
 	projection_view: Mat4,
-	up: Vec4,
-	right: Vec4,
+	camera_up: Vec4,
+	camera_right: Vec4,
 	// NOTE: align to Vec4s
 }
 
@@ -55,14 +55,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let sdl = sdl2::init()?;
 	let sdl_video = sdl.video()?;
 
-	let (window, gl_ctx) = init_window(&sdl_video)?;
+	let (window, mut gl_ctx) = init_window(&sdl_video)?;
 
 	let mut instrumenter = perf::Instrumenter::new(&gl_ctx);
 
+	gl_ctx.add_shader_import("global", include_str!("global.common.glsl"));
+	gl_ctx.add_shader_import("particle", include_str!("particle.common.glsl"));
+	gl_ctx.add_shader_import("paint", include_str!("paint.common.glsl"));
+
 	let mut uniforms = Uniforms {
 		projection_view: Mat4::ident(),
-		up: Vec4::from_y(1.0),
-		right: Vec4::from_x(1.0),
+		camera_up: Vec4::from_y(1.0),
+		camera_right: Vec4::from_x(1.0),
 	};
 
 	let uniform_buffer = gl_ctx.new_buffer();
@@ -166,8 +170,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		let camera_orientation = Mat4::yrot(yaw) * Mat4::xrot(pitch);
 
-		uniforms.up = camera_orientation * Vec4::from_y(1.0);
-		uniforms.right = camera_orientation * Vec4::from_x(1.0);
+		uniforms.camera_up = camera_orientation * Vec4::from_y(1.0);
+		uniforms.camera_right = camera_orientation * Vec4::from_x(1.0);
 
 		uniforms.projection_view = Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
 			* Mat4::translate(Vec3::from_z(-zoom))

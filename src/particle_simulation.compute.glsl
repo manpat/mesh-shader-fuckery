@@ -1,28 +1,12 @@
 #version 450
 
+#import particle
+#import paint
+
 layout(local_size_x=16, local_size_y=1, local_size_z=1) in;
 
 
-
-struct Particle {
-	vec3 position;
-	vec3 velocity;
-	vec3 tail;
-	// vec3 color;
-};
-
-
-layout(std430, binding = 0) buffer ParticleData {
-    Particle particles[];
-};
-
-
-
-layout(std140, binding = 1) uniform PaintData {
-	vec2 u_world_size;
-};
-
-layout(binding = 0) uniform sampler2D u_paint_image;
+layout(binding = 0) uniform sampler2D u_paint_sampler;
 
 
 
@@ -34,19 +18,19 @@ vec3 sample_paint(vec2 world_pos) {
 		ivec2( 0, 8),
 	};
 
-	vec2 sample_pos = (world_pos + u_world_size/2.0) / u_world_size;
-	vec4 samples = textureGatherOffsets(u_paint_image, sample_pos, offsets, 0);
+	vec2 sample_pos = (world_pos + u_paint.world_size/2.0) / u_paint.world_size;
+	vec4 samples = textureGatherOffsets(u_paint_sampler, sample_pos, offsets, 0);
 	return vec3(
 		samples.y - samples.x,
 		samples.w - samples.z,
-		texture(u_paint_image, sample_pos)
+		texture(u_paint_sampler, sample_pos)
 	);
 }
 
 
 
 void update_particle(uint particle_index) {
-	Particle particle = particles[particle_index];
+	Particle particle = g_particles[particle_index];
 
 	vec3 diff = vec3(0.0, 3.0, 0.0) - particle.position;
 	float dist = length(diff);
@@ -66,7 +50,7 @@ void update_particle(uint particle_index) {
 
 	particle.tail += (particle.position - particle.tail) * 0.04;
 
-	particles[particle_index] = particle;
+	g_particles[particle_index] = particle;
 }
 
 
@@ -78,7 +62,7 @@ void main() {
 
 	const uint idx = gl_LocalInvocationIndex + workgroup_size * global_idx;
 
-	if (idx < particles.length()) {
+	if (idx < g_particles.length()) {
 		update_particle(idx);
 	}
 }

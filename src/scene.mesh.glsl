@@ -1,6 +1,8 @@
 #version 450
 #extension GL_NV_mesh_shader : require
 
+#import global
+
 layout(triangles) out;
 layout(local_size_x=32) in;
 layout(max_vertices=64, max_primitives=126) out;
@@ -16,12 +18,6 @@ struct Meshlet {
 	uint primitive_count;
 	uint vertex_begin;
 	uint primitive_begin;
-};
-
-layout(std140, binding = 0) uniform UniformData {
-	layout(row_major) mat4 u_projection_view;
-	vec4 u_up;
-	vec4 u_right;
 };
 
 layout(std430, binding = 0) buffer VertexData {

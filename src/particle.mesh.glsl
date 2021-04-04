@@ -1,34 +1,19 @@
 #version 450
 #extension GL_NV_mesh_shader : require
 
-layout(triangles) out;
+#import global
+#import particle
 
+
+layout(triangles) out;
 
 layout(local_size_x=32) in;
 layout(max_vertices=64, max_primitives=64) out;
 
 
-struct Particle {
-	vec3 position;
-	vec3 velocity;
-	vec3 tail;
-	// vec3 color;
-};
-
-
 taskNV in Task {
   uint t_base_particle_id;
   uint t_global_id;
-};
-
-layout(std140, binding = 0) uniform UniformData {
-    layout(row_major) mat4 u_projection_view;
-	vec4 u_up;
-	vec4 u_right;
-};
-
-layout(std430, binding = 0) readonly buffer ParticleData {
-    Particle particles[];
 };
 
 
@@ -85,10 +70,10 @@ void main() {
 		uint vertex_index = min(v * num_threads + local_id, max_vertices-1);
 		uint particle_index = (work_group_base * vertex_iterations + vertex_index) / positions.length();
 
-		Particle particle = particles[particle_index];
+		Particle particle = g_particles[particle_index];
 
 		vec2 pos_uv = positions[vertex_index % positions.length()];
-		vec3 pos_local = pos_uv.x * u_right.xyz + pos_uv.y * u_up.xyz;
+		vec3 pos_local = pos_uv.x * u_camera_right.xyz + pos_uv.y * u_camera_up.xyz;
 
 		// float size = max(length(particle.velocity)*3.0, 1.0);
 		float size = 30.0;

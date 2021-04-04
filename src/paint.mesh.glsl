@@ -1,20 +1,12 @@
 #version 450
 #extension GL_NV_mesh_shader : require
 
+#import global
+#import paint
+
 layout(triangles) out;
 layout(local_size_x=2) in;
 layout(max_vertices=4, max_primitives=2) out;
-
-
-layout(std140, binding = 0) uniform UniformData {
-	layout(row_major) mat4 u_projection_view;
-	vec4 u_up;
-	vec4 u_right;
-};
-
-layout(std140, binding = 1) uniform PaintData {
-	vec2 u_world_size;
-};
 
 
 out PerVertexData {
@@ -40,7 +32,7 @@ void main() {
 		uint vertex_index = v * num_threads + local_id;
 
 		vec2 position = positions[vertex_index % positions.length()];
-		vec2 position_world = (position - 0.5) * u_world_size;
+		vec2 position_world = (position - 0.5) * u_paint.world_size;
 
 		gl_MeshVerticesNV[vertex_index].gl_Position = u_projection_view * vec4(position_world.x, 0.0, position_world.y, 1.0);
 		vert_out[vertex_index].uv = position;

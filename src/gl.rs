@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 
 pub mod raw {
 	include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
@@ -6,6 +8,7 @@ pub mod raw {
 
 pub struct Context {
 	_sdl_ctx: sdl2::video::GLContext,
+	imports: HashMap<String, String>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -59,7 +62,8 @@ impl Context {
 		}
 
 		Context {
-			_sdl_ctx: sdl_ctx
+			_sdl_ctx: sdl_ctx,
+			imports: HashMap::new(),
 		}
 	}
 
@@ -106,6 +110,40 @@ impl Context {
 		}
 	}
 
+
+	pub fn add_shader_import(&mut self, name: impl Into<String>, src: impl Into<String>) {
+		let existing_import_src = self.imports.insert(name.into(), src.into());
+		assert!(existing_import_src.is_none());
+	}
+
+	fn resolve_imports(&self, mut src: &str) -> String {
+		let search_pattern = "#import";
+		let mut result = String::with_capacity(src.len());
+
+		while !src.is_empty() {
+			let (prefix, suffix) = match src.split_once(search_pattern) {
+				Some(pair) => pair,
+				None => {
+					result.push_str(src);
+					break
+				}
+			};
+
+			let (import_name, suffix) = suffix.split_once('\n')
+				.expect("Expected '#common <name>'");
+			src = suffix;
+
+			let import_name = import_name.trim();
+			let import_str = self.imports.get(import_name)
+				.expect("Unknown import");
+
+			result.push_str(prefix);
+			result.push_str(import_str);
+		}
+
+		result
+	}
+
 	pub fn new_shader(&self, shaders: &[(u32, &str)]) -> Program {
 		use std::ffi::CString;
 		use std::str;
@@ -114,8 +152,10 @@ impl Context {
 			let program_handle = raw::CreateProgram();
 
 			for &(ty, src) in shaders {
-				let shader_handle = raw::CreateShader(ty);
+				let src = self.resolve_imports(&src);
 				let src = CString::new(src.as_bytes()).unwrap();
+
+				let shader_handle = raw::CreateShader(ty);
 
 				raw::ShaderSource(shader_handle, 1, &src.as_ptr(), std::ptr::null());
 				raw::CompileShader(shader_handle);

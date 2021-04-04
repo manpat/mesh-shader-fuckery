@@ -1,10 +1,7 @@
 #version 450
 
-layout(std140, binding = 1) uniform PaintData {
-	vec2 u_world_size;
-};
+layout(binding = 0) uniform sampler2D u_paint_sampler;
 
-layout(binding = 0) uniform sampler2D u_image_binding;
 
 in PerVertexData {
 	vec2 uv;
@@ -22,7 +19,7 @@ vec2 sample_paint(vec2 uv) {
 		ivec2( 0, 3),
 	};
 
-	vec4 samples = textureGatherOffsets(u_image_binding, uv, offsets, 0);
+	vec4 samples = textureGatherOffsets(u_paint_sampler, uv, offsets, 0);
 	return vec2(
 		samples.y - samples.x,
 		samples.w - samples.z
@@ -30,7 +27,7 @@ vec2 sample_paint(vec2 uv) {
 }
 
 void main() {
-	float value = texture(u_image_binding, vert_in.uv).r;
+	float value = texture(u_paint_sampler, vert_in.uv).r;
     // out_color = vec4(value, vert_in.uv, 1.0);
     out_color = vec4(fract(value));
     // out_color = vec4(vec3(sample_paint(vert_in.uv) * 0.5 + 0.5, 0.0), 1.0);
