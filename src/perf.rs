@@ -82,7 +82,7 @@ impl Instrumenter {
 			for section in self.waiting_sections.drain(..) {
 				let (time_nanos, triangles) = section.result();
 				let time_ms = time_nanos as f64 / 1000_000.0;
-				// print!("[{}: {}tris {:.3}ms] ", section.name, triangles, time_ms);
+				print!("[{}: {}tris {:.3}ms] ", section.name, triangles, time_ms);
 
 				total_time += time_ms;
 				total_tris += triangles;
@@ -90,7 +90,7 @@ impl Instrumenter {
 				self.section_cache.push(section);
 			}
 
-			// println!("[[total: {}tris {:.3}ms]]", total_tris, total_time);
+			println!("[[total: {}tris {:.3}ms]]", total_tris, total_time);
 
 			self.state = State::Recording;
 		}

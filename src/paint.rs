@@ -49,6 +49,8 @@ impl PaintSystem {
 		let brush_uniforms = gl_ctx.new_buffer();
 		let texture = gl_ctx.new_texture(4096, 4096, gl::raw::R32F);
 		texture.clear();
+		texture.set_wrap(false);
+		texture.set_filter(true, true);
 
 		PaintSystem {
 			rendering_program,
@@ -93,7 +95,7 @@ impl PaintSystem {
 			self.brush_uniforms.upload(&[brush_uniforms], gl::BufferUsage::Dynamic);
 
 			// TODO: actually figure out numbers
-			gl_ctx.dispatch_compute(256, 256, 1);
+			gl_ctx.dispatch_compute(512, 512, 1);
 		}
 
 		inst.end_section();

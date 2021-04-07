@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		projection_view: Mat4::ident(),
 		camera_up: Vec4::from_y(1.0),
 		camera_right: Vec4::from_x(1.0),
-		world_size: Vec2::splat(50.0),
+		world_size: Vec2::splat(200.0),
 
 		_0: Vec2::zero(),
 	};
@@ -102,8 +102,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut wireframe_enabled = false;
 
-	let mut scene_view_enabled = true;
-	let mut particles_enabled = true;
+	let mut scene_view_enabled = false;
+	let mut particles_enabled = false;
 	let mut paint_enabled = true;
 	let mut terrain_enabled = true;
 
@@ -235,9 +235,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 				particles.update(&gl_ctx, &mut instrumenter, paint_system.resources());
 			}
 
-			if paint_enabled {
-				paint_system.update(&gl_ctx, &mut instrumenter);
-			}
+			paint_system.update(&gl_ctx, &mut instrumenter);
 		}
 
 		unsafe {

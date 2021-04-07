@@ -2,6 +2,7 @@ use common::math::*;
 use crate::{gl, perf, paint};
 
 // https://onrendering.com/data/papers/isubd/isubd.pdf
+// https://victorbush.com/2015/01/tessellated-terrain/
 
 pub struct Terrain {
 	program: gl::Program,
@@ -25,7 +26,7 @@ impl Terrain {
 		gl_ctx.use_program(self.program);
 
 		inst.start_section("terrain");
-		gl_ctx.draw_mesh_tasks(0, 1);
+		gl_ctx.draw_mesh_tasks(0, 60000);
 		inst.end_section();
 	}
 }
